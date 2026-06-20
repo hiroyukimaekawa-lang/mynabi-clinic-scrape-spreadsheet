@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>マイナビ一括取得ツール (スプシ専用)</title>
+    <link rel="stylesheet" href="scraper.css" />
+</head>
+
+<body>
+    <main>
+        <h1>マイナビ一括取得ツール (スプシ専用)</h1>
+        <p class="lead">スプレッドシートの「A列(シート記事名)」と「B列(URL)」をまとめてコピーし、下の枠に貼り付けてください。</p>
+
+        <section class="panel">
+            <label>
+                対象データ（エクセル・スプシからそのままペースト）
+                <textarea id="startUrls" rows="8" placeholder="シート記事名    https://clinic.mynavi.jp/article/..."
+                    style="width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; margin-top: 6px; font-size: 14px; resize: vertical; white-space: pre;"></textarea>
+            </label>
+
+            <div class="row" style="grid-template-columns: 1fr;">
+                <label>
+                    待機秒 (アクセス間隔。大量に取得する場合は1.0〜2.0秒にしてください)
+                    <input id="delay" type="number" min="0" step="0.1" value="1.0" />
+                </label>
+            </div>
+
+            <div class="buttons">
+                <button id="startBtn">一括実行</button>
+                <button id="csvBtn" disabled>CSV保存</button>
+            </div>
+
+            <div id="status" class="status">待機中</div>
+        </section>
+
+        <section class="panel">
+            <h2>ログ</h2>
+            <pre id="log"></pre>
+        </section>
+    </main>
+    <script src="scraper.js"></script>
+</body>
+
+</html>

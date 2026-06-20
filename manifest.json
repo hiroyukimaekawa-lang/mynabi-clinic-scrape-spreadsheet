@@ -1,0 +1,16 @@
+{
+    "manifest_version": 3,
+    "name": "マイナビ一括取得ツール (スプシ専用)",
+    "version": "1.0.0",
+    "description": "スプレッドシートの記事名とURLをコピペして一括で情報を抽出します。",
+    "permissions": [
+        "downloads"
+    ],
+    "host_permissions": [
+        "https://clinic.mynavi.jp/*"
+    ],
+    "action": {
+        "default_title": "マイナビ一括取得ツール",
+        "default_popup": "popup.html"
+    }
+}
