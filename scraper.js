@@ -10,12 +10,13 @@ const PREFECTURES = [
     "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"
 ];
 
-const state = { running: false, rows: [] };
+const state = { running: false, stopRequested: false, rows: [] };
 
 const ui = {
     startUrls: document.getElementById("startUrls"),
     delay: document.getElementById("delay"),
     startBtn: document.getElementById("startBtn"),
+    stopBtn: document.getElementById("stopBtn"),
     csvBtn: document.getElementById("csvBtn"),
     status: document.getElementById("status"),
     log: document.getElementById("log"),
@@ -174,6 +175,24 @@ function extractClinicsFromArticleHtml(html, articleUrl, sheetName = "") {
     const rows = [];
 
     blocks.forEach((block) => {
+        // ★ PR判定（超強化版: いただいたCSS情報に基づく）
+
+        // 1. ブロック自体が「pr」クラスを持っているか (←今回のCSS情報からの確実な判定)
+        if (block.classList.contains('pr')) return;
+
+        // 2. ブロックの中に「pr」クラスを持つ要素があるか
+        if (block.querySelector('.pr')) return;
+
+        // 3. IDによる判定 (末尾が -A, -B など)
+        const closestIdEl = block.closest("[id]");
+        const blockId = block.getAttribute("id") || (closestIdEl ? closestIdEl.getAttribute("id") : "");
+        if (blockId.match(/-[a-zA-Z]$/)) return;
+
+        // 4. テキストによる判定 (「PR」という文字だけが入った要素があるか)
+        const isPrByText = Array.from(block.querySelectorAll('*')).some(el => el.childNodes.length === 1 && el.textContent.trim() === "PR");
+        if (isPrByText) return;
+
+
         const hours = extractConsultationHours(block);
         const timeParts = hours ? hours.split("|").map(s => s.trim()) : [];
         const parseTime = (part, pos) => {
@@ -235,6 +254,14 @@ function downloadText(filename, text, mimeType) {
     chrome.downloads.download({ url: objectUrl, filename, saveAs: true }, () => setTimeout(() => URL.revokeObjectURL(objectUrl), 1000));
 }
 
+ui.stopBtn.addEventListener("click", () => {
+    if (state.running) {
+        state.stopRequested = true;
+        ui.stopBtn.disabled = true;
+        log("⚠️ 停止リクエストを受け付けました。現在の処理が終わり次第ストップします...");
+    }
+});
+
 async function runScrape() {
     if (state.running) return;
 
@@ -253,15 +280,24 @@ async function runScrape() {
 
     const delaySec = Number(ui.delay.value) || 1.0;
     state.running = true;
+    state.stopRequested = false;
     state.rows = [];
+
     ui.startBtn.disabled = true;
+    ui.stopBtn.disabled = false;
     ui.csvBtn.disabled = true;
     ui.log.textContent = "";
-    log(`スクレイピング開始（対象: ${inputData.length}件）`);
+    log(`▶️ スクレイピング開始（対象: ${inputData.length}件）`);
 
     try {
         const rows = [];
         for (let i = 0; i < inputData.length; i++) {
+            if (state.stopRequested) {
+                log(`🛑 ユーザー操作により処理を中断しました。`);
+                setStatus(`中断: ${i}件完了`);
+                break;
+            }
+
             const { sheetName, url } = inputData[i];
             setStatus(`解析中: ${i + 1}/${inputData.length}`);
             log(`----------------------------------------\n[${i + 1}/${inputData.length}] URL: ${url}`);
@@ -272,16 +308,27 @@ async function runScrape() {
                 const html = await fetchHtml(url);
                 const extracted = extractClinicsFromArticleHtml(html, url, sheetName);
                 extracted.forEach((r) => rows.push(r));
-                log(`抽出成功: ${extracted.length}件`);
+                log(`✅ 抽出成功: ${extracted.length}件`);
             } catch (err) {
-                log(`WARN 取得失敗: ${url} (${errText(err)})`);
+                log(`❌ WARN 取得失敗: ${url} (${errText(err)})`);
             }
+
+            if (state.stopRequested) {
+                log(`🛑 ユーザー操作により処理を中断しました。`);
+                setStatus(`中断: ${i + 1}件完了`);
+                break;
+            }
+
             if (i < inputData.length - 1) await sleep(delaySec);
         }
 
         state.rows = rows;
-        setStatus(`完了: 合計 ${state.rows.length}件`);
-        log(`========================================\n全処理完了: ${state.rows.length}件`);
+
+        if (!state.stopRequested) {
+            setStatus(`完了: 合計 ${state.rows.length}件`);
+            log(`========================================\n🎉 全処理完了: ${state.rows.length}件`);
+        }
+
         ui.csvBtn.disabled = state.rows.length === 0;
     } catch (err) {
         setStatus("エラーで停止しました");
@@ -289,6 +336,7 @@ async function runScrape() {
     } finally {
         state.running = false;
         ui.startBtn.disabled = false;
+        ui.stopBtn.disabled = true;
     }
 }
 
